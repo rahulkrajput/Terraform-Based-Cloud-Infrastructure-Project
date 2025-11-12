@@ -23,7 +23,7 @@ Before we begin, make sure you have the following:
 To use Terraform and Azure Cli, you need to install it on your local machine. Follow these steps to install and configure Terraform:
 
 - Download Terraform from the official website.
-- Install Terraform according to your operating system(Mine Ubuntu OS). (Check the **Reference** in the end of this README File)
+- Install Terraform according to your operating system (mine is Ubuntu OS). (Check the Reference at the end of this README file.)
 - Verify the installation by running **terraform --version**.
 - Install the Azure CLI on Linux
    - The easiest way to install the Azure CLI is through a script maintained by the Azure CLI team. 
@@ -33,10 +33,10 @@ To use Terraform and Azure Cli, you need to install it on your local machine. Fo
 
 - Configure your Azure credentials by running **az login --use-device-code**
 ```
-# You will received device code like that:
+# You will receive a device code like that:
 To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code ITR5N7GCK to authenticate.
 
-Open your browser and type in your azure account email id and paste the code
+Open your browser and type in your Azure account email ID and paste the code.
 ```
 
 ## Step-03: Create SSH Public Key for Linux VMs
@@ -88,7 +88,7 @@ data "azurerm_kubernetes_service_versions" "current" {
 
 ## Step-06: Create Azure AD Group for AKS Admins Terraform Resource
 - To enable AKS AAD Integration, we need to provide Azure AD group object id. 
-- We wil create a Azure AD Group in Active Directory for AKS Admins
+- We will create a Azure AD Group in Active Directory for AKS Admins
 ```
 # Create Azure AD Group in Active Directory for AKS Admins
 resource "azuread_group" "aks_administrators" {
@@ -302,9 +302,9 @@ Password: !@Kubeadmin!6
 
 ## Reference:
 
-[Installation of Terraform](https://developer.hashicorp.com/terraform/install)
-[Install the Azure CLI on Linux](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?view=azure-cli-latest&pivots=apt)
-[Understand the concept of Terraform Datasources](https://www.terraform.io/docs/configuration/data-sources.html)
-[Data Source: Azurerm kubernetes service versions](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/kubernetes_service_versions)
-[Concept of Azure Active Directory group In Terraform for AKS Admins](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/group) 
-[Understand about the terraform resource named for Azurerm kubernetes cluster](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
+- [Installation of Terraform](https://developer.hashicorp.com/terraform/install)
+- [Install the Azure CLI on Linux](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?view=azure-cli-latest&pivots=apt)
+- [Understand the concept of Terraform Datasources](https://www.terraform.io/docs/configuration/data-sources.html)
+- [Data Source: Azurerm kubernetes service versions](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/kubernetes_service_versions)
+- [Concept of Azure Active Directory group In Terraform for AKS Admins](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/group) 
+- [Understand about the terraform resource named for Azurerm kubernetes cluster](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
