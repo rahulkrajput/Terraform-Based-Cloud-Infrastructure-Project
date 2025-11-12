@@ -1,517 +1,310 @@
-# Provision Azure AKS and Install ArgoCD using Terraform & Azure DevOps
+# Provision Azure AKS Cluster using Terraform
+
+## Prerequisites
+Before we begin, make sure you have the following:
+
+- Microsoft Azure Cloud Account
+- Terraform installed on your local machine
+- Azure CLI installed and configured
 
 ## Step-01: Brief Intro
-- Create Azure DevOps Pipeline to create AKS cluster and Install ArgoCD using Terraform
-- Terraform Manifests Validate
-- Provision Prod AKS Cluster
-- Install ArgoCD Server
-- Declarative Management of Kubernetes Objects Using Kustomize
+- Install and Configure Terraform, Azure Cli
+- Create SSH Keys for AKS Linux VMs
+- Create Datasource for Azure AKS latest Version
+- Create Azure AD AKS Admins Group Resource in Terraform
+- Create AKS Cluster with default nodepool
+- Create AKS Cluster Output Values
+- Provision Azure AKS Cluster using Terraform
+- Access and Test using Azure AKS default admin `--admin`
+- Access and Test using Azure AD User as AKS Admin
 
 
-## Step-02: Install Azure Market Place Plugins in Azure DevOps
-- Install below listed plugins in your respective Azure DevOps Organization
-- [Plugin: Terraform by Microsoft Devlabs](https://marketplace.visualstudio.com/items?itemName=ms-devlabs.custom-terraform-tasks)
+## Step-02: Install and Configure Terraform, Azure Cli
+To use Terraform and Azure Cli, you need to install it on your local machine. Follow these steps to install and configure Terraform:
 
-
-
-## Step-03: Review Terraform Manifests
-### 01-main.tf
-- Comment Terraform Backend, because we are going to configure that in Azure DevOps
-
-### 02-variables.tf
-- Two variables we will define in Azure DevOps and use it
-  - Environment 
-  - SSH Public Key (We Define SSH Variable here, but we fetch ssh key From Azure Devops Secure File)
- 
-
-### 03-resource-group.tf
-- We are going to create resource groups for each environment with **terraform-aks-envname**
-- Example Name:
-  - terraform-aks-prod
-  
-
-### 04-aks-versions-datasource.tf
-- We will get the latest version of AKS using this datasource. 
-- `include_preview = false` will ensure that preview versions are not listed
-
-### 05-aks-administrators-azure-ad.tf
-- We are going to create Azure AD Group per environment for AKS Admins
-- To create this group we need to ensure Azure AD Directory Write permission is there for our Service Principal (Service Connection) created in Azure DevOps
-- Provide Permission to create Azure AD Groups
-
-### 06-aks-cluster.tf
-- Name of the AKS Cluster going to be **ResourceGroupName-Cluster**
-- Example Names:
-  - terraform-aks-prod-cluster
-  
-### 07-outputs.tf  
-- We will put out output values very simple
-- Resource Group 
-  - Location
-  - Name
-  - ID
-- AKS Cluster 
-  - AKS Versions
-  - AKS Latest Version
-  - AKS Cluster ID
-  - AKS Cluster Name
-  - AKS Cluster Kubernetes Version
-- AD Group
-  - ID
-  - Object ID
- 
- 
-
-
-## Step-04: Create Github Repository
-
-### Create Github Repository in Github
-- Create Repository in your github
-- Name: GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project
-- Descritpion: A GitOps Workflow project using ArgoCD on Kubernetes focuses on automating and managing deployments by using Git.
-- Repository Type: Public or Private (As Per Requirement)
-- Click on **Create Repository**
-
-### Create files, Initialize Local Repo, Push to Remote Git Repo
+- Download Terraform from the official website.
+- Install Terraform according to your operating system(Mine Ubuntu OS). (Check the **Reference** in the end of this README File)
+- Verify the installation by running **terraform --version**.
+- Install the Azure CLI on Linux
+   - The easiest way to install the Azure CLI is through a script maintained by the Azure CLI team. 
 ```
-# Create folder in local desktop
+ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
 
-mkdir GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project
-cd GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project
+- Configure your Azure credentials by running **az login --use-device-code**
+```
+# You will received device code like that:
+To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code ITR5N7GCK to authenticate.
 
-# Create new folders inside "GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project" in local desktop
-kubernetes-cluster-manifests (Create Yaml Files for Deployment on AKS Cluster)
-terraform-manifests (Create Terraform Files for Provision AKS Cluster)
-Pipelines (It is used for Save Pipeline, while Creating of AKS Cluster, Install ArgoCD and Docker Build Push Image via Azure Devops Pipeline)
+Open your browser and type in your azure account email id and paste the code
+```
 
-
-
-# Initialize Git Repo
-cd GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project
-git init
-
-# Add Files & Commit to Local Repo
-git add .
-git commit -am "GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project"
-
-# Add Remote Origin and Push to Remote Repo
-git remote add origin https://github.com/rahulkrajput/GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project.git
-git push --set-upstream origin master 
-
-```     
-
-
-## Step-05: Create New Azure DevOps Project for IAC
-- Go to -> Azure DevOps -> Select Organization -> GitOps-Workflow-with-ArgoCD-on-Kubernetes ->  Create New Project
-- Project Name: Provision-GitOps-Workflow-with-ArgoCD-on-Terraform-AKS-Cluster
-- Project Descritpion: Provision-GitOps-Workflow-with-ArgoCD-on-Terraform-AKS-Cluster
-- Visibility: Private
-- Click on **Create**
-
-## Step-06: Create Azure RM Service Connection for Terraform Commands
-- This is a pre-requisite step required during Azure Pipelines
-- Go to -> Azure DevOps -> Select Organization -> Select project **Provision-GitOps-Workflow-with-ArgoCD-on-Terraform-AKS-Cluster**
-- Go to **Project Settings**
-- Go to Pipelines -> Service Connections -> Create Service Connection
-- Choose a Service Connection type: Azure Resource Manager
-- Identity type: App registration (automatic)
-- Credential: Workload identity federation (automatic)
-- Scope Level: Subscription
-- Subscription: Select_Your_Subscription
-- Resource Group: No need to select any resource group
-- Service Connection Name: GitOps-ArgoCD-Terraform-AKS-Cluster-svc-conn
-- Description: Service Connection for provisioning GitOps workflow with ArgoCD On Terraform AKS Cluster
-- Security: Grant access permissions to all pipelines (check it - leave to default)
-- Click on **SAVE**
-
-
-## Step-07: Provide Permission to create Azure AD Groups
-- Provide permission for Service connection created in previous step to create Azure AD Groups
-- Go to -> Azure DevOps -> Select Organization -> Select project **Provision-GitOps-Workflow-with-ArgoCD-on-Terraform-AKS-Cluster**
-- Go to **Project Settings** -> Pipelines -> Service Connections 
-- Open **GitOps-ArgoCD-Terraform-AKS-Cluster-svc-conn**
-- Click on **Manage App registration**, new tab will be opened 
-- Click on **View API Permissions**
-- Click on **Add Permission**
-- Select an API: Microsoft APIs
-- Microsoft APIs: Use **Microsoft Graph**
-- Click on **Application Permissions**
-- Select permissions : "Directory" and click on it 
-- Check **Directory.ReadWrite.All** and click on **Add Permission**
-- Click on **Grant Admin consent for Default Directory**
-
-
-
-## Step-08: Create SSH Public Key for Linux VMs
-- Create this out of your git repository 
-- **Important Note:**  We should not have these files in our git repos for security Reasons
+## Step-03: Create SSH Public Key for Linux VMs
 ```
 # Create Folder
-mkdir $HOME/ssh-keys-terraform-aks-devops
+mkdir $HOME/.ssh/aks-prod-sshkeys-terraform
 
-# Create SSH Keys
+# Create SSH Key
 ssh-keygen \
     -m PEM \
     -t rsa \
     -b 4096 \
     -C "azureuser@myserver" \
-    -f ~/ssh-keys-terraform-aks-devops/aks-terraform-devops-ssh-key-ubuntu \
-
-Note: We will have passphrase as : empty when asked
+    -f ~/.ssh/aks-prod-sshkeys-terraform/aksprodsshkey \
+    -N mypassphrase
 
 # List Files
-ls -lrt $HOME/ssh-keys-terraform-aks-devops
-Private File: aks-terraform-devops-ssh-key-ubuntu (To be stored safe with us)
-Public File: aks-terraform-devops-ssh-key-ubuntu.pub (To be uploaded to Azure DevOps)
+ls -lrt $HOME/.ssh/aks-prod-sshkeys-terraform
 ```
 
-## Step-09: Upload file to Azure DevOps as Secure File
-- Go to Azure DevOps -> - Go to -> Azure DevOps -> Select Organization -> GitOps-Workflow-with-ArgoCD-on-Kubernetes ->  Create New Project
- -> Provision-GitOps-Workflow-with-ArgoCD-on-Terraform-AKS-Cluster -> Pipelines -> Library
-- Secure File -> Upload file named **aks-terraform-devops-ssh-key-ubuntu.pub**
-- Open the file and click on **Pipeline permissions -> Click on three dots -> Confirm open access -> Click on Open access**
-- Click on **SAVE**
+## Step-04: Create Terraform Input Vairables to variables.tf
 
+- SSH Public Key for Linux VMs
 
-## Step-10: Create Azure Pipeline to Provision AKS Cluster
-- Go to -> Azure DevOps -> Select Organization -> Select project 
-- Go to Pipelines -> Pipelines -> Create Pipeline
-### Where is your Code?
-- Github
-- Select Your Repository
-- Provide your github password
-- Click on **Approve and Install** on Github
-### Configure your Pipeline
-- Select Pipeline: Starter Pipeline  
-- Pipeline Name: 01-Provision-and-Destroy-Terraform-AKS-Cluster-Pipeline.yml
-- Design your Pipeline As Per Need
-### Pipeline Save and Run
-- Click on **Save and Run**
-- Commit Message: Provision Prod AKS Cluster via terraform
-- Click on **Job** and Verify Pipeline
-
-### Verify new Storage Account in Azure Mgmt Console
-
-- Verify Storage Account
-- Verify Storage Container
-- Verify tfstate file got created in storage container
-
-### Verify new AKS Cluster in Azure Mgmt Console
-- Verify Resource Group 
-- Verify AKS Cluster
-- Verify AD Group
-- Verify Tags for a nodepool
-
-### Connect to Prod AKS Cluster & verify
+```
+# SSH Public Key for Linux VMs
+variable "ssh_public_key" {
+  default = "~/.ssh/aks-prod-sshkeys-terraform/aksprodsshkey.pub"
+  description = "This variable defines the SSH Public Key for Linux k8s Worker nodes"  
+}
 ```
 
-# List Nodepools
-az aks nodepool list --cluster-name terraform-aks-prod-cluster --resource-group terraform-aks-prod -o table
+## Step-05: Create a Terraform Datasource for getting latest Azure AKS Versions 
 
-# Setup kubeconfig
-az aks get-credentials --resource-group <Resource-Group-Name>  --name <AKS-Cluster-Name>
-az aks get-credentials --resource-group terraform-aks-prod  --name terraform-aks-prod-cluster --admin
+- Data sources allow data to be fetched or computed for use elsewhere in Terraform configuration. 
+- Create **aks-versions-datasource.tf**
+- **Important Note:**
+  Keep in mind include_preview value should be false because the default value is true, which means we want to accept the preview version of Kubernetes and in a production-grade cluster it is not the right choice. We should always stick with stable versions.
+```
+# Datasource to get Latest Azure AKS latest Version
+data "azurerm_kubernetes_service_versions" "current" {
+  location = azurerm_resource_group.aks_rg.location
+  include_preview = false  
+}
+```
 
-# View Cluster Info
+
+
+
+## Step-06: Create Azure AD Group for AKS Admins Terraform Resource
+- To enable AKS AAD Integration, we need to provide Azure AD group object id. 
+- We wil create a Azure AD Group in Active Directory for AKS Admins
+```
+# Create Azure AD Group in Active Directory for AKS Admins
+resource "azuread_group" "aks_administrators" {
+  name        = "${azurerm_resource_group.aks_rg.name}-cluster-administrators"
+  description = "Azure AKS Kubernetes administrators for the ${azurerm_resource_group.aks_rg.name}-cluster."
+}
+```
+
+## Step-07: Create AKS Cluster Terraform Resource
+- Create a file named  **aks-cluster.tf**
+
+```
+# Provision AKS Cluster
+
+
+resource "azurerm_kubernetes_cluster" "aks_cluster" {
+  dns_prefix          = "${azurerm_resource_group.aks_rg.name}"
+  location            = azurerm_resource_group.aks_rg.location
+  name                = "${azurerm_resource_group.aks_rg.name}-cluster"
+  resource_group_name = azurerm_resource_group.aks_rg.name
+  kubernetes_version  = data.azurerm_kubernetes_service_versions.current.latest_version
+  node_resource_group = "${azurerm_resource_group.aks_rg.name}-nrg"
+
+
+  default_node_pool {
+    name       = "systempool"
+    vm_size    = "Standard_D2as_v4"
+    orchestrator_version = data.azurerm_kubernetes_service_versions.current.latest_version
+    auto_scaling_enabled = true
+    max_count            = 3
+    min_count            = 1
+    os_disk_size_gb      = 30
+    type           = "VirtualMachineScaleSets"
+    node_public_ip_enabled = false
+    node_labels = {
+      "nodepool-type" = "system"
+      "environment"   = var.environment
+      "nodepoolos"    = "linux"
+      "app"           = "system-apps"
+    }
+    tags = {
+      "nodepool-type" = "system"
+      "environment"   = var.environment
+      "nodepoolos"    = "linux"
+      "app"           = "system-apps"
+    }    
+  }
+
+# Identity (System Assigned or Service Principal)
+  identity { type = "SystemAssigned" }
+
+
+
+# RBAC and Azure AD Integration Block
+
+azure_active_directory_role_based_access_control {
+  
+  admin_group_object_ids = [azuread_group.aks_administrators.object_id] 
+}
+
+
+# Linux Profile
+linux_profile {
+  admin_username = "Your_User_Name"
+  ssh_key {
+      key_data = file(var.ssh_public_key)
+  }
+}
+
+# Network Profile
+network_profile {
+  load_balancer_sku = "standard"
+  network_plugin = "azure"
+}
+
+# AKS Cluster Tags 
+tags = {
+  Environment = var.environment
+}
+
+}
+
+```
+
+## Step-08: Create Terraform Output Values for AKS Cluster
+- Create a file named **outputs.tf**
+```
+# Create Outputs
+# 1. Resource Group Location
+# 2. Resource Group Id
+# 3. Resource Group Name
+
+# Resource Group Outputs
+output "location" {
+  value = azurerm_resource_group.aks_rg.location
+}
+
+output "resource_group_id" {
+  value = azurerm_resource_group.aks_rg.id
+}
+
+output "resource_group_name" {
+  value = azurerm_resource_group.aks_rg.name
+}
+
+# Azure AKS Versions Datasource
+output "versions" {
+  value = data.azurerm_kubernetes_service_versions.current.versions
+}
+
+output "latest_version" {
+  value = data.azurerm_kubernetes_service_versions.current.latest_version
+}
+
+# Azure AD Group Object Id
+
+output "azure_ad_group_object_id" {
+  value = azuread_group.aks_administrators.object_id
+}
+
+# Azure AKS Outputs
+
+output "aks_cluster_id" {
+  value = azurerm_kubernetes_cluster.aks_cluster.id
+}
+
+output "aks_cluster_name" {
+  value = azurerm_kubernetes_cluster.aks_cluster.name
+}
+
+output "aks_cluster_kubernetes_version" {
+  value = azurerm_kubernetes_cluster.aks_cluster.kubernetes_version
+}
+
+```
+
+## Step-09: Deploy Terraform Resources
+```
+# Initialize Terraform 
+terraform init
+
+# Validate Terraform manifests
+terraform validate
+
+# Review the Terraform Plan
+terraform plan
+
+# Deploy Terraform manifests
+terraform apply 
+```
+
+## Step-10: Access Terraform created AKS cluster using AKS default admin
+```
+# Azure AKS Get Credentials with --admin
+az aks get-credentials --resource-group terraform-aks-prod --name terraform-aks-prod-cluster --admin
+
+# Get Full Cluster Information
+az aks show --resource-group terraform-aks-prod --name terraform-aks-prod-cluster -o table
+
+# Get AKS Cluster Information using kubectl
 kubectl cluster-info
 
-# List Kubernetes Worker Nodes
+# List Kubernetes Nodes
 kubectl get nodes
-
-# Verify Deployment Status:
-
-- ArgoCD Pods:
-kubectl get pods -n argocd
-
-- ArgoCD Service:
-kubectl get svc -n argocd
-
-- Ingress Controller Pods:
-kubectl get pod -n ingress-nginx
-
-- Ingress Controller Service:
-kubectl get svc -n ingress-nginx
-
-```
-## Step-11: Create Ingress File 
-```
-Create Ingress File with any Name (In Our Case we create "nginx-ingress.yml" File)
-
-#  vi nginx-ingress.yml
-
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-server-http-ingress
-  namespace: argocd
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" #(Sometime it work with HTTPS and Sometime it work with HTTP Protocol, Also change Port number as well according to your Protocol HTTPS Or HTTP)
-    nginx.ingress.kubernetes.io/service-upstream: "true"
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
-spec:
-  
-  rules:
-  - host: argocd.ubei.info # Add Your Domain
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            port:
-              number: 443
-
-# Apply Nginx-Ingress File
-
-kubectl apply -f nginx-ingress.yml
-
-```
-## Step-11A: Verify Ingress Status
-
-```
-kubectl get ingress -n argocd
-```
-Output:
-
-![Image](https://github.com/user-attachments/assets/7e84f16e-9bef-49db-ac89-ead7eb320cc5)
-
-
-
-## Step-12: Edit argocd ConfigMap 
-```
-Edit argocd ConfigMap and Update yaml with 
-
-    “ data:
-           server.insecure: "true"  ”
-
-# kubectl edit configmap argocd-cmd-params-cm -n argocd -o yaml
-
-apiVersion: v1
-data:
-  server.insecure: "true" 
-kind: ConfigMap
-metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","kind":"ConfigMap","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"argocd-cmd-params-cm","app.kubernetes.io/part-of":"argocd"},"name":"argocd-cmd-params-cm","namespace":"argocd"}}
-  creationTimestamp: "2025-11-02T13:18:49Z"
-  labels:
-    app.kubernetes.io/name: argocd-cmd-params-cm
-    app.kubernetes.io/part-of: argocd
-  name: argocd-cmd-params-cm
-  namespace: argocd
-  resourceVersion: "117859"
-  uid: bceeb42d-ded5-4b3a-acbb-03639e4f1b1d
-
-```
-## Step-13: Create DNS Zone 
-
--	Go to Azure Portal and Search -> **DNS Zones**
--	Subscription: Your_Subscription 
--	Resource Group: terraform-aks-prod-nrg
--	Name: ubei.info (Zone Name)
--	Resource Group Location: centralindia
--	Click on Review + Create
-
-## Step-13A: Copy Azure Nameservers Name
-
- -	Go to Azure Portal and Search -> DNS Zones-> ubei.info-> Overview
-```
-ns3-05.azure-dns.org	
-ns2-05.azure-dns.net	
-ns1-05.azure-dns.com	
-ns4-05.azure-dns.info	
-```
-## Step-14: Go to Your Domain Registrar Update Nameservers 
-
-- Verify before updation
-
-```
-nslookup -type=SOA ubei.info
-nslookup -type=NS ubei.info
 ```
 
-
-Output:
-
-<img width="663" height="319" alt="Image" src="https://github.com/user-attachments/assets/53e9e5f3-35c3-4c38-89e0-3817e270470d" />
-
-
-
-
--	Login into your Domain Provider Account (My Domain Registrar: ionos.com)
--	Click on Add or edit name servers
--	Update Azure Name servers here and click on Save
--	Wait for Next 48 hours (but usually it updates Name Servers within 3-4 hours.)
--	Verify after updation
-
-```
-nslookup -type=NS ubei.info 8.8.8.8
-nslookup -type=SOA ubei.info 8.8.8.8
-```
-
-Output:
-
-<img width="877" height="614" alt="Image" src="https://github.com/user-attachments/assets/8926082f-3f0c-46a2-ba61-1cb6034774cd" />
-
-
-
-##  Step-15: Now, Create A record in DNS Zone (ubei.info)
-
--	Go to RecordSet
--	Click on Add
--	Type Name : argocd
--	Value : Type your External-IP address (Which you got when you created the Ingress Controller. If want to know about it, go to Terminal & type “ kubectl get svc -n ingress-nginx ”)
-
-
-![Image](https://github.com/user-attachments/assets/e01fe98c-e2ec-44e0-a58f-6d291c4df4df)
-
--	Go to Browser type Your host name “argocd.ubei.info”
-
-Output: 
-
-<img width="975" height="638" alt="Image" src="https://github.com/user-attachments/assets/57a8b726-5f4a-465e-ba52-7dc1c3e70cd3" />
-
-
-## Step-16: Logon ArgoCD Dashboard
-
-To log in to ArgoCD Dashboard, you need to have Credentials First for that.
-- Go to Your Terminal and type the following Command:
-
-```
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-```
-Output:
-
-![Image](https://github.com/user-attachments/assets/d1b0d335-fab1-4d67-bb61-eea1150d2a78)
-
-- Username:  admin
-- Password:  933hQdT-FwpAnePZ
-
-After Login
-
-Output: 
-
-![Image](https://github.com/user-attachments/assets/cff84b6d-7eb4-4d60-a2ae-9b5e9fb7ad80)
-
-
-## Step-17: Setting Up ArgoCD Application with AKS Cluster and Kustomize 
-
-**First you have to structuring their Kustomize files for different environments, with a suggested directory structure should look like this:**
-
-```
-~/GitOps-ArgoCD
-.
-├── application
-│     └── Web-App.yml
-└── environment
-      └── prod
-          ├── base
-          │     ├── 01-Deployment-Web-App.yml
-          │     ├── 02-Service-Web-App.yml
-          │     └── kustomization.yml
-          └── overlays
-                ├── 01-Deployment-Web-App.yml
-                └── kustomization.yml
-```
-
-**Create a New Application file to Connect with your Git repo where your Manifests File exists for deploy on AKS Cluster**
-
-- vi Web-App.yml
-
-```
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: web-app
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: 'https://github.com/rahulkrajput/GitOps-Workflow-with-ArgoCD-on-Kubernetes-Project.git'
-    path: GitOps-ArgoCD/environment/prod/overlays
-    targetRevision: main
-  destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: kube-web
-  syncPolicy:
-    syncOptions:
-    - CreateNamespace=true
-    automated:
-      selfHeal: true
-      prune: true
-```
-- Apply Web-App.yml File with following Command:
-
-```
-kubectl apply -f Web-App.yml
-```
-
-Output: 
-
-![Image](https://github.com/user-attachments/assets/b15d69ae-6ec3-454a-9476-d360cb15ec2f)
-
-*Once the Application is created, ArgoCD will monitor your Git repository for changes and automatically apply updates to your Kubernetes cluster based on the Kustomize configurations.*
-
-- Verify Deployment
-```
-# To get Namespace
-kubectl get ns
-
-# To get Pods
-kubectl get pod -n kube-web
-
-# To get Service
-kubectl get svc -n kube-web
-```
-## Step-18 Check Web-App Working Or Not
-
-- To get the IP from Service which we deployed while Deployment
- ```
- kubectl get svc -n kube-web
- ```
- Output:
- 
- ![Image](https://github.com/user-attachments/assets/6a439cdf-2c63-454d-8e25-293e7b26b91e)
-
- - Copy the External-IP and paste it in browser and check web page working or not
-
- Output:
-
- ![Image](https://github.com/user-attachments/assets/66ca3b82-df5d-498b-a694-1e00f598e6dd)
-
- Now You See, Our Web Page Working Fine.
-
- **We've now successfully walked through the process of setting up ArgoCD on your Terraform Azure Kubernetes Service (AKS) cluster using Azure DevOps Pipeline**
-
-## Step-19: Delete Resources
-Delete the Resources either through the Pipeline Or Manually 
-
-### Pipeline
-
-- If you want to Delete AKS Cluster, Uncomment "destroy task" in Provision AKS Cluster(pipeline) and re-run the pipeline
-
-### Manually
-- Delete the Resource group which will delete all resources
+## Step-11: Verify Resources using Azure Management Console
+- Resource Group
   - terraform-aks-prod
-  
-- Delete AD Groups  
+  - terraform-aks-prod-nrg
+- AKS Cluster & Node Pool
+  - Cluster: terraform-aks-prod-cluster
+  - AKS System Pool
+- Azure AD Group
+  - terraform-aks-prod-cluster-administrators
 
+
+## Step-12: Create a User in Azure AD and Associate User to AKS Admin Group in Azure AD
+- Create a user in Azure Active Directory
+  - User Name: kube-user
+  - Name: kube-user
+  - First Name: kube
+  - Last Name: user
+  - Password: !@Kubeadmin!5
+  - Groups: terraform-aks-prod-cluster-administrators
+  - Click on Create
+- Login and change password 
+  - URL: https://portal.azure.com
+  - Username: kube-user@xyz.onmicrosoft.com  (Change your domain name)
+  - Old Password: !@Kubeadmin!5
+  - New Password: !@Kubeadmin!6
+  - Confirm Password: !@Kubeadmin!6
+
+## Step-13: Access Terraform created AKS Cluster 
+```
+# Azure AKS Get Credentials with --admin
+az aks get-credentials --resource-group terraform-aks-prod --name terraform-aks-prod-cluster --overwrite-existing
+
+# List Kubernetes Nodes
+kubectl get nodes
+URL: https://microsoft.com/devicelogin
+Code: ACJ3T9GUK (sample)
+Username: kube-user@xyz.onmicrosoft.com  (Change your domain name)
+Password: !@Kubeadmin!6
+```
 ## Notes
 
-- **Make sure to replace placeholders (e.g., Your_Subscription_ID, your_cluster_name, your_region, your_resource_group_name...etc) with your actual Configuration.**
+- Make sure to replace placeholders (e.g., Your_Subscription_ID, your_cluster_name, your_region, your_resource_group_name, your_domain_name...etc) with your actual Configuration.
 
-- **This is a basic setup for demonstration purposes. In a production environment, you should follow best practices for security and performance.**
+- This is a basic setup for demonstration purposes. In a production environment, you should follow best practices for security and performance.
 
-## References
-- [Installation Of ArgoCD](https://argo-cd.readthedocs.io/en/stable/getting_started/)
-- [Kubernetes - Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
-- [Installation Of Nginx Ingress-Controller On AKS Cluster with kubectl apply, using YAML manifests](https://kubernetes.github.io/ingress-nginx/deploy/#azure)
-- [Azure DevOps Pipelines - Deployment Jobs](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/deployment-jobs?view=azure-devops)
-- [Azure DevOps Pipelines - Environments](https://docs.microsoft.com/en-us/azure/devops/pipelines/process/environments?view=azure-devops)
-- [Declarative Management of Kubernetes Objects Using Kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
+## Reference:
 
-
+[Installation of Terraform](https://developer.hashicorp.com/terraform/install)
+[Install the Azure CLI on Linux](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?view=azure-cli-latest&pivots=apt)
+[Understand the concept of Terraform Datasources](https://www.terraform.io/docs/configuration/data-sources.html)
+[Data Source: Azurerm kubernetes service versions](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/kubernetes_service_versions)
+[Concept of Azure Active Directory group In Terraform for AKS Admins](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/group) 
+[Understand about the terraform resource named for Azurerm kubernetes cluster](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/kubernetes_cluster)
