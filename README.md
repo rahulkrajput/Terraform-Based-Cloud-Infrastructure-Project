@@ -57,7 +57,52 @@ ssh-keygen \
 ls -lrt $HOME/.ssh/aks-prod-sshkeys-terraform
 ```
 
-## Step-04: Create Terraform Input Vairables to variables.tf
+## Step-04: Create a main.tf file as Following
+```
+# 1. Terraform Settings Block
+
+terraform {
+
+  # A. Required Version Terraform
+  required_version = ">= 1.0" 
+
+  # B. Required Terraform Providers  
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
+    
+  }
+
+# Terraform State Storage to Azure Storage Container
+  backend "azurerm" {
+    resource_group_name   = "terraform-storage-rg"
+    storage_account_name  = "terraformstorage05"
+    container_name        = "tfstatebackupfile"
+    key                   = "aks-base.tfstate"
+  }  
+}
+
+
+
+# 2. Terraform Provider Block for AzureRM
+provider "azurerm" {
+  subscription_id = "Your_Subscription_ID"
+  features {
+    
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
+}
+```
+
+## Step-05: Create Terraform Input Vairables to variables.tf
 
 - SSH Public Key for Linux VMs
 
@@ -69,7 +114,7 @@ variable "ssh_public_key" {
 }
 ```
 
-## Step-05: Create a Terraform Datasource for getting latest Azure AKS Versions 
+## Step-06: Create a Terraform Datasource for getting latest Azure AKS Versions 
 
 - Data sources allow data to be fetched or computed for use elsewhere in Terraform configuration. 
 - Create **aks-versions-datasource.tf**
@@ -86,7 +131,7 @@ data "azurerm_kubernetes_service_versions" "current" {
 
 
 
-## Step-06: Create Azure AD Group for AKS Admins Terraform Resource
+## Step-07: Create Azure AD Group for AKS Admins Terraform Resource
 - To enable AKS AAD Integration, we need to provide Azure AD group object id. 
 - We will create a Azure AD Group in Active Directory for AKS Admins
 ```
@@ -97,7 +142,7 @@ resource "azuread_group" "aks_administrators" {
 }
 ```
 
-## Step-07: Create AKS Cluster Terraform Resource
+## Step-08: Create AKS Cluster Terraform Resource
 - Create a file named  **aks-cluster.tf**
 
 ```
@@ -173,7 +218,7 @@ tags = {
 
 ```
 
-## Step-08: Create Terraform Output Values for AKS Cluster
+## Step-09: Create Terraform Output Values for AKS Cluster
 - Create a file named **outputs.tf**
 ```
 # Create Outputs
@@ -225,7 +270,7 @@ output "aks_cluster_kubernetes_version" {
 
 ```
 
-## Step-09: Deploy Terraform Resources
+## Step-10: Deploy Terraform Resources
 ```
 # Initialize Terraform 
 terraform init
@@ -240,7 +285,7 @@ terraform plan
 terraform apply 
 ```
 
-## Step-10: Access Terraform created AKS cluster using AKS default admin
+## Step-11: Access Terraform created AKS cluster using AKS default admin
 ```
 # Azure AKS Get Credentials with --admin
 az aks get-credentials --resource-group terraform-aks-prod --name terraform-aks-prod-cluster --admin
@@ -255,7 +300,7 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-## Step-11: Verify Resources using Azure Management Console
+## Step-12: Verify Resources using Azure Management Console
 - Resource Group
   - terraform-aks-prod
   - terraform-aks-prod-nrg
@@ -266,7 +311,7 @@ kubectl get nodes
   - terraform-aks-prod-cluster-administrators
 
 
-## Step-12: Create a User in Azure AD and Associate User to AKS Admin Group in Azure AD
+## Step-13: Create a User in Azure AD and Associate User to AKS Admin Group in Azure AD
 - Create a user in Azure Active Directory
   - User Name: kube-user
   - Name: kube-user
@@ -282,7 +327,7 @@ kubectl get nodes
   - New Password: !@Kubeadmin!6
   - Confirm Password: !@Kubeadmin!6
 
-## Step-13: Access Terraform created AKS Cluster 
+## Step-14: Access Terraform created AKS Cluster 
 ```
 # Azure AKS Get Credentials with --admin
 az aks get-credentials --resource-group terraform-aks-prod --name terraform-aks-prod-cluster --overwrite-existing
