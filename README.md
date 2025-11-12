@@ -74,7 +74,7 @@ variable "ssh_public_key" {
 - Data sources allow data to be fetched or computed for use elsewhere in Terraform configuration. 
 - Create **aks-versions-datasource.tf**
 - **Important Note:**
-  Keep in mind include_preview value should be false because the default value is true, which means we want to accept the preview version of Kubernetes and in a production-grade cluster it is not the right choice. We should always stick with stable versions.
+  Keep in mind `include_preview` value should be false because the default value is true, which means we want to accept the preview version of Kubernetes and in a production-grade cluster it is not the right choice. We should always stick with stable versions.
 ```
 # Datasource to get Latest Azure AKS latest Version
 data "azurerm_kubernetes_service_versions" "current" {
